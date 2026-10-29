@@ -1,59 +1,51 @@
--- Code section 1
--- Attach plugins to the game window
+-- Attach plugin to the game window
 game_window = ui.Interfaces:GetComponent(id.Component.TOPLEVEL_V2__PLUGIN_BUILD_LAYER_TOP)
 
-necromancyTutQuest = config.Quest.QUEST_NECROMANCY_TUTORIAL
+-- Initialize local constants
+local necromancyTutQuest = config.Quest.QUEST_NECROMANCY_TUTORIAL
+local BOX_ID = id.Interface.CHAT_V2_LEFT -- 1184 is the most common chat box type
+local NAME_ID = 4 --speaker's name is component 4 in the chatbox 
+local TEXT_ID = 10 -- text spoken is component 10
+local TED_TUTORIAL_CONFIG_NAME = ""
+local TED_DIALOGUE_1 = ""
+local TED_DIALOGUE_2 = ""
+local TED_DIALOGUE_REPLACE = "whats poppin gamer"
 
-print(necromancyTutQuest.params)
-
-for param in necromancyTutQuest.params do
-    print(param)
+--Function to retrieve labels from active dialogue boxes
+local function boxLabel(staticID)
+    local ok, label = pcall(function()
+        if ui.Interfaces:GetInterface(BOX_ID) == nil then return nil end
+        local component = ui.Interfaces:GetComponent(BOX_ID, staticID)
+        if component ~= nil and component.visibleGlobal == true then return component end
+        return nil
+    end)
+    return ok and label or nil
 end
 
--- Code section 2
--- Create a new group box for components
-local myGroupBox = ui.GroupBox.new(game_window)
-myGroupBox.stylesheetID = id.StyleSheet.DEFAULT
-myGroupBox:SetHeaderLayout(0,0,0,0,0)
-myGroupBox:SetSize(250,200)
-myGroupBox:SetPos(0,0,0.6,0.4)
-
--- Code section 3
--- Add some text
-local myText = ui.Text.new(myGroupBox)
-myText:SetSize(0,0,1.0,0.5)
-myText:SetPos(0,0)
-myText.content = "Hello world!"
-myText.font = id.Font.MUSEO_SANS_15PT_REGULAR
-myText:AlignTo(ui.AlignMode.CENTRE)
-
--- Code section 4 version 2
--- Add a button
-local myButton = ui.Button.new(myGroupBox)
-myButton:SetPos(0,0,0.0,0.5)
-myButton:SetSize(0,0,1.0,0.5)
-myButton.label = "Push this button"
-myButton.stylesheetID = id.StyleSheet.BUTTON_DEFAULT
-
--- Code section 5 version 2
--- Creating the button callback function relies on information defined later in the script
-local function buttonPress()
-    myText.content = myText.content.."!"
+--Function for replacing lines in the dialogue box
+local function replaceLine()
+    local name, text = boxLabel(NAME_ID), boxLabel(TEXT_ID)
+    if name == nil or text == nil then return end
+    if name.content ~= TED_DIALOGUE_1 then return end
+    if text.content == TED_DIALOGUE_1 then text.content = TED_DIALOGUE_REPLACE .. "s" end
 end
-myButton:Subscribe(ui.Hook.ONBUTTONPRESSED, buttonPress)
 
--- Code section 6
--- Get the config for the Lumbridge guards
-local lumGuardConfig = config.NPC.FAI_LUMBRIDGE_GUARD_PATROL
-local lumGuardName = lumGuardConfig.name
-myText.content = lumGuardConfig.name .. " is size " .. tostring(lumGuardConfig.gridSize)
+--Debug function for detecting NPCs and returning their config names
+local function detectNPC(npcEntityAddedEvent)
+    log("NPC " .. npcEntityAddedEvent.npcEntity.config.configName .. " appeared.")
 
--- Code section 7 version 3
--- When the button is pressed: Find all nearby NPCs that match the config and display their location
-local function buttonPress()
-    localLumGuards = NPCList.ByName('Lumbridge Guardsman')
-    for _,npc in pairs(localLumGuards) do
-        myText.content = formatStr('{} is at position {} and is facing {}',npc.config.name,tostring(npc.coordGrid),npc.facing)
+    if npcEntityAddedEvent.npcEntity.config.configName == TED_TUTORIAL_CONFIG_NAME then
+        replaceLine()
     end
+
 end
-myButton:Subscribe(ui.Hook.ONBUTTONPRESSED, buttonPress)
+
+--Debug function for returning transmitted VarPlayers and their values
+local function detectVar(varDetected)
+    log(varDetected.valueType)
+    --log("Var transmitted: " .. varDetected.config.name .. "\n Old var value: " .. varDetected.oldValue .. "\n New var value: " .. varDetected.newValue)
+end
+
+--Event subscriptions for when Vars are transmitted by the game and when an NPC is added to the screen
+Event.VarTransmit.Subscribe("varDetectEvent", detectVar)
+Event.NPCEntityAdded.Subscribe("npcDetectEvent", detectNPC)
